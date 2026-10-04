@@ -1,0 +1,1685 @@
+/*
+ * The venue canvas — stage, zones, tables, guest chips, and their animations.
+ * This intentionally stays as plain CSS: keyframes, drag states, and the
+ * single-coordinate-space chip choreography don't translate to utilities.
+ * All colors come from the design tokens in index.css.
+ */
+
+:root {
+  --chip-move: 680ms cubic-bezier(0.23, 0.9, 0.28, 1);
+}
+
+.canvas-wrap {
+  position: relative;
+  /* Everything layered inside the canvas — zoom controls, banners, the
+     question card — stacks inside it, so the masthead's menu and the toolbox
+     page can sit above the whole floor plan without a z-index arms race. */
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(1100px 720px at 54% 40%, rgba(236, 223, 195, 0.035), transparent 68%),
+    var(--color-pine-900);
+}
+
+.canvas-wrap.panning,
+.canvas-wrap.panning .stage {
+  cursor: grabbing;
+}
+
+.canvas-zoom-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: 30px 54px 30px;
+  overflow: hidden;
+  border: 1px solid rgba(197, 165, 94, 0.32);
+  border-radius: 9px;
+  background: rgba(24, 38, 29, 0.94);
+  box-shadow: 0 7px 20px rgba(4, 9, 6, 0.3);
+}
+
+.canvas-zoom-controls button {
+  height: 30px;
+  border: 0;
+  border-right: 1px solid rgba(197, 165, 94, 0.18);
+  background: transparent;
+  color: rgba(236, 223, 195, 0.84);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.canvas-zoom-controls button:last-child { border-right: 0; }
+.canvas-zoom-controls button:hover:not(:disabled) { background: rgba(197, 165, 94, 0.12); }
+.canvas-zoom-controls button:focus-visible { outline: 2px solid var(--color-gold-bright); outline-offset: -3px; }
+.canvas-zoom-controls button:disabled { opacity: 0.35; cursor: default; }
+.canvas-zoom-controls .zoom-readout { color: rgba(236, 223, 195, 0.82); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+
+.stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  background: transparent;
+  user-select: none;
+  cursor: grab;
+}
+
+.room-frame {
+  position: absolute;
+  border: 1px solid rgba(197, 165, 94, 0.42);
+  border-radius: 3px;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(232, 207, 143, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 207, 143, 0.022) 1px, transparent 1px),
+    /* floorboard seams, ~2.3′ planks */
+    repeating-linear-gradient(90deg, rgba(236, 223, 195, 0.02) 0 1px, transparent 1px 46px),
+    radial-gradient(900px 520px at 42% 34%, rgba(236, 223, 195, 0.055), transparent 64%),
+    linear-gradient(180deg, #21372a, #192d22);
+  background-size:
+    var(--grid-x, 100px) var(--grid-y, 100px),
+    var(--grid-x, 100px) var(--grid-y, 100px),
+    auto,
+    100% 100%,
+    100% 100%;
+  background-repeat: repeat, repeat, repeat, no-repeat, no-repeat;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 0 38px rgba(5, 12, 8, 0.18);
+}
+
+/* The inner line of a double-line wall, the way plans draw masonry. */
+.room-frame::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(197, 165, 94, 0.16);
+  border-radius: 1px;
+}
+
+.room-frame.resizing {
+  border-color: var(--color-gold-bright);
+  box-shadow:
+    0 0 0 1px rgba(232, 207, 143, 0.25),
+    0 14px 34px rgba(0, 0, 0, 0.22),
+    inset 0 0 38px rgba(5, 12, 8, 0.18);
+}
+
+/* Handles on the room's walls — drag to give the venue more (or less) feet,
+   mirroring how amenities resize. They sit on the frame's edge midpoints and
+   bottom-right corner, subtle until hovered or focused. --handle-scale is the
+   inverse of the camera zoom, so they stay grabbable at any zoom level. */
+.room-resize-handle {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%) scale(var(--handle-scale, 1));
+  border: 1px solid rgba(232, 207, 143, 0.55);
+  border-radius: 7px;
+  background: #223329;
+  color: var(--color-gold-bright);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(5, 9, 6, 0.5);
+  opacity: 0.5;
+  transition: opacity 120ms ease, transform 120ms ease;
+  touch-action: none;
+}
+
+.room-resize-handle:hover,
+.room-resize-handle:focus-visible,
+.room-frame.resizing ~ .room-resize-handle {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(calc(var(--handle-scale, 1) * 1.1));
+}
+
+.room-resize-handle:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 3px;
+}
+
+.room-resize-handle.corner { cursor: nwse-resize; }
+.room-resize-handle.edge-e { cursor: ew-resize; }
+.room-resize-handle.edge-s { cursor: ns-resize; }
+
+.room-size-readout {
+  position: absolute;
+  z-index: 7;
+  transform: translate(-100%, -100%) scale(var(--handle-scale, 1));
+  transform-origin: 100% 100%;
+  border: 1px solid rgba(197, 165, 94, 0.4);
+  border-radius: 3px;
+  background: rgba(20, 31, 24, 0.94);
+  padding: 3px 8px;
+  color: var(--color-gold-bright);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Dimension strings — lettered in mono, like the measure lines on a sheet. */
+.room-dims {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.room-dims line {
+  stroke: rgba(236, 223, 195, 0.42);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.room-dims text {
+  fill: rgba(236, 223, 195, 0.88);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* The title block — an architect's sheet signs itself in the corner. */
+.title-block {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  transform: translateX(-100%);
+  border: 1px solid rgba(236, 223, 195, 0.28);
+  background: rgba(20, 31, 24, 0.55);
+  color: rgba(236, 223, 195, 0.84);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.title-block > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  border-left: 1px solid rgba(236, 223, 195, 0.22);
+}
+
+.title-block > span:first-child {
+  border-left: 0;
+}
+
+.title-block b {
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(236, 223, 195, 0.68);
+}
+
+.title-block-name {
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-gold-bright);
+}
+
+.title-block-name em {
+  font-weight: 500;
+  font-style: italic;
+  color: rgba(236, 223, 195, 0.86);
+}
+
+.scale-bar {
+  position: absolute;
+  z-index: 3;
+  height: 7px;
+  border-top: 1px solid rgba(236, 223, 195, 0.38);
+  border-right: 1px solid rgba(236, 223, 195, 0.38);
+  border-left: 1px solid rgba(236, 223, 195, 0.38);
+  color: rgba(236, 223, 195, 0.8);
+  pointer-events: none;
+}
+
+.scale-bar span {
+  position: absolute;
+  right: 0;
+  top: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.alignment-guide {
+  position: absolute;
+  z-index: 42;
+  display: block;
+  background: rgba(92, 206, 192, 0.86);
+  box-shadow: 0 0 8px rgba(92, 206, 192, 0.28);
+  pointer-events: none;
+}
+
+.alignment-guide.vertical { width: 1px; }
+.alignment-guide.horizontal { height: 1px; }
+
+.selection-status {
+  position: absolute;
+  z-index: 43;
+  transform: translateX(-50%);
+  border: 1px solid rgba(92, 206, 192, 0.32);
+  border-radius: 3px;
+  background: rgba(18, 37, 33, 0.94);
+  padding: 3px 8px;
+  color: rgba(174, 234, 225, 0.88);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* ---- venue floor and movable amenities ------------------------------------ */
+
+.event-resource {
+  position: absolute;
+  z-index: 5;
+  border: 1px solid rgba(126, 211, 198, 0.7);
+  border-radius: 8px;
+  background: rgba(35, 91, 91, 0.45);
+  color: #e8f8f2;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(8, 31, 31, 0.24);
+}
+
+.event-resource-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.event-resource-label {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: rgba(236, 248, 242, 0.82);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(8, 31, 31, 0.8);
+  pointer-events: none;
+}
+
+.event-resource-judge_table {
+  border-color: rgba(232, 207, 143, 0.82);
+  background: rgba(104, 77, 38, 0.86);
+}
+
+.venue-feature {
+  position: absolute;
+  z-index: 4;
+  border-radius: 10px;
+  touch-action: none;
+  color: rgba(232, 207, 143, 0.84);
+  /* Geometry eases so agent-driven placement glides like the tables do;
+     live human drags/resizes suspend it below to stay 1:1 with the pointer. */
+  transition:
+    left 500ms ease, top 500ms ease, width 500ms ease, height 500ms ease, transform 500ms ease,
+    box-shadow 150ms ease, border-color 150ms ease, filter 150ms ease;
+}
+
+.venue-feature.dragging,
+.venue-feature.resizing,
+.venue-feature.rotating,
+/* Every piece in a multi-select — and every piece the room's walls are
+   pushing around — has to track the pointer 1:1, not just the one under it. */
+.venue-feature.live {
+  transition: box-shadow 150ms ease, border-color 150ms ease, filter 150ms ease;
+}
+
+.feature-move-surface {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  cursor: grab;
+  font: inherit;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 10px;
+  touch-action: none;
+}
+
+.venue-feature:hover {
+  border-color: rgba(232, 207, 143, 0.75);
+  filter: brightness(1.12);
+}
+
+.venue-feature.dragging,
+.venue-feature.resizing {
+  z-index: 44;
+  box-shadow: 0 12px 28px rgba(5, 9, 6, 0.45), 0 0 0 3px rgba(232, 207, 143, 0.16);
+}
+
+.venue-feature.selected {
+  box-shadow: 0 0 0 2px rgba(232, 207, 143, 0.88), 0 8px 20px rgba(5, 9, 6, 0.35);
+}
+
+/* Spotlight while a zone rule about this feature is hovered in the sidebar. */
+.venue-feature.rule-glow {
+  box-shadow:
+    0 0 0 3px rgba(232, 207, 143, 0.9),
+    0 0 22px 8px rgba(232, 207, 143, 0.35),
+    0 8px 20px rgba(5, 9, 6, 0.35);
+}
+
+.venue-feature.dragging .feature-move-surface,
+.venue-feature.resizing .resize-handle,
+.venue-feature.rotating .rotate-handle {
+  cursor: grabbing;
+}
+
+.feature-move-surface:focus-visible,
+.resize-handle:focus-visible,
+.rotate-handle:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 3px;
+}
+
+/* The illustration layer — decorative SVG beneath the labels and handles. */
+.feature-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.venue-feature .zone-label {
+  display: block;
+  max-width: calc(100% - 6px);
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(20, 31, 24, 0.6);
+  padding: 3px 10px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.23em;
+  text-transform: uppercase;
+  text-indent: 0.23em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.venue-feature.compact .feature-move-surface {
+  gap: 3px;
+  padding: 6px;
+}
+
+.venue-feature.compact .zone-label {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-indent: 0.12em;
+  padding: 2px 8px;
+}
+
+.venue-feature.horizontal-content .feature-move-surface {
+  flex-direction: row;
+  gap: 7px;
+  padding-inline: 10px;
+}
+
+.venue-feature.micro .feature-move-surface {
+  padding: 4px;
+}
+
+.venue-feature.micro .zone-label,
+.venue-feature.micro .move-hint {
+  display: none;
+}
+
+.move-hint {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid rgba(197, 165, 94, 0.35);
+  border-radius: 3px;
+  background: rgba(20, 31, 24, 0.92);
+  padding: 2px 7px;
+  color: rgba(236, 223, 195, 0.85);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.venue-feature:hover .move-hint,
+.feature-move-surface:focus-visible .move-hint,
+.venue-feature.dragging .move-hint {
+  opacity: 1;
+}
+
+.resize-handle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  z-index: 8;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(232, 207, 143, 0.74);
+  border-radius: 7px;
+  background: #223329;
+  color: var(--color-gold-bright);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(5, 9, 6, 0.5);
+  cursor: nwse-resize;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+  touch-action: none;
+}
+
+.venue-feature:hover .resize-handle,
+.resize-handle:focus-visible,
+.venue-feature.resizing .resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1.06);
+}
+
+.rotate-handle {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 8;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(232, 207, 143, 0.74);
+  border-radius: 999px;
+  background: #223329;
+  color: var(--color-gold-bright);
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(5, 9, 6, 0.5);
+  cursor: grab;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.venue-feature:hover .rotate-handle,
+.rotate-handle:focus-visible,
+.venue-feature.dragging .rotate-handle,
+.venue-feature.rotating .rotate-handle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1.06);
+}
+
+.size-readout {
+  position: absolute;
+  right: 19px;
+  bottom: -5px;
+  z-index: 7;
+  border-radius: 3px;
+  background: rgba(20, 31, 24, 0.94);
+  padding: 2px 7px;
+  color: rgba(236, 223, 195, 0.85);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.venue-feature:hover .size-readout,
+.venue-feature.resizing .size-readout,
+.resize-handle:focus-visible + .size-readout {
+  opacity: 1;
+}
+
+.venue-feature.overlapping {
+  border-color: rgba(235, 106, 86, 0.95);
+  box-shadow: 0 0 0 2px rgba(235, 106, 86, 0.58), 0 0 22px rgba(235, 106, 86, 0.2);
+}
+
+.collision-badge {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  z-index: 12;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #f7ead8;
+  border-radius: 999px;
+  background: var(--color-brick);
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 3px 8px rgba(5, 9, 6, 0.48);
+  pointer-events: none;
+}
+
+/* Per-amenity chrome: the illustration itself is the .feature-art SVG; here
+   each type keeps only its frame — gold for the zones a guest stands in,
+   sage for furniture, dashed linen for the threshold. */
+.venue-feature-dance_floor {
+  border: 1px solid rgba(197, 165, 94, 0.5);
+  background: rgba(197, 165, 94, 0.03);
+}
+
+.venue-feature-band {
+  border: 1px dashed rgba(197, 165, 94, 0.45);
+  background: linear-gradient(to bottom, rgba(197, 165, 94, 0.08), rgba(197, 165, 94, 0.03));
+}
+
+.venue-feature-entrance {
+  border: 1px dashed rgba(236, 223, 195, 0.35);
+  background: rgba(236, 223, 195, 0.02);
+}
+
+.venue-feature-bathroom,
+.venue-feature-photo_booth,
+.venue-feature-bar,
+.venue-feature-buffet,
+.venue-feature-cake_table,
+.venue-feature-gift_table {
+  border: 1px solid rgba(143, 160, 138, 0.4);
+  background: rgba(143, 160, 138, 0.06);
+  color: rgba(236, 223, 195, 0.86);
+}
+
+.venue-feature-cake_table {
+  border-radius: 50%;
+}
+
+/* ---- the lounge -------------------------------------------------------------
+   A fixed footer docked to the bottom of the canvas — a sibling of .stage,
+   not a child, so it never inherits the room's zoom transform. Its own size
+   and position are plain CSS, unaffected by zooming in or out. */
+
+.lounge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid rgba(236, 223, 195, 0.18);
+  background: linear-gradient(180deg, rgba(23, 27, 24, 0.94), rgba(15, 18, 16, 0.98));
+  transition: height 180ms ease;
+}
+
+.lounge.resizing {
+  transition: none;
+}
+
+.lounge.drop-target {
+  border-top-color: var(--color-gold-bright);
+  box-shadow: inset 0 0 0 3px rgba(232, 207, 143, 0.18);
+}
+
+/* The draggable strip along the lounge's top edge — grab it to resize. */
+.lounge-resize-handle {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  cursor: row-resize;
+  touch-action: none;
+  z-index: 1;
+}
+
+.lounge-resize-handle.disabled {
+  cursor: default;
+}
+
+.lounge-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(236, 223, 195, 0.22);
+  transition: background 120ms ease;
+}
+
+.lounge-resize-handle:hover::after,
+.lounge-resize-handle:focus-visible::after {
+  background: var(--color-gold-bright);
+}
+
+.lounge-resize-handle.disabled::after {
+  background: transparent;
+}
+
+.lounge-header {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 14px 0;
+}
+
+.lounge-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.lounge-chevron {
+  width: 13px;
+  height: 13px;
+  color: rgba(236, 223, 195, 0.75);
+  transition: transform 150ms ease;
+}
+
+.lounge-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.lounge-label {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  color: rgba(236, 223, 195, 0.88);
+}
+
+.lounge-meta {
+  color: rgba(236, 223, 195, 0.74);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.lounge-chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 12px 14px;
+  padding: 10px 14px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.lounge-empty {
+  color: rgba(236, 223, 195, 0.74);
+  font-size: 12px;
+}
+
+/* The one chip currently being dragged, rendered above both the stage and
+   the lounge so it never disappears under the lounge's background while
+   crossing the boundary between the two. */
+.drag-ghost-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 46;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* ---- tables --------------------------------------------------------------- */
+
+.table-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  transform-origin: 50% 50%;
+}
+
+/* How furniture travels when something other than the pointer moves it — an
+   agent's placement, a rule repair, the room being resized. The class is
+   dropped while the pointer is dragging the piece, so that stays 1:1. */
+.table-wrap.glide,
+.seat-chair.glide {
+  transition: transform 500ms ease;
+}
+
+.table {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #efe7d2;
+  color: var(--color-ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(41, 36, 25, 0.22),
+    inset 0 0 18px rgba(41, 36, 25, 0.09),
+    0 6px 18px rgba(10, 16, 12, 0.45);
+  cursor: grab;
+  transition: box-shadow 150ms ease;
+}
+
+.table-rotate-handle {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  z-index: 9;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(232, 207, 143, 0.72);
+  border-radius: 999px;
+  background: #223329;
+  color: var(--color-gold-bright);
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(5, 9, 6, 0.45);
+  cursor: grab;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.table-wrap:hover .table-rotate-handle,
+.table-wrap.selected .table-rotate-handle,
+.table-wrap.rotating .table-rotate-handle,
+.table-rotate-handle:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1.06);
+}
+
+.table-wrap.rotating .table-rotate-handle { cursor: grabbing; }
+.table-rotate-handle:focus-visible { outline: 2px solid var(--color-gold-bright); outline-offset: 3px; }
+
+.table:active {
+  cursor: grabbing;
+}
+
+.table.round {
+  border-radius: 50%;
+}
+
+.table.rect {
+  border-radius: 12px;
+}
+
+/* The linen-and-china layer under the labels. */
+.table-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.table .t-name,
+.table .t-count {
+  position: relative;
+  z-index: 1;
+}
+
+.table .t-name {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-align: center;
+  padding: 0 8px;
+  pointer-events: none;
+}
+
+.table .t-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+  pointer-events: none;
+}
+
+.table.selected {
+  box-shadow:
+    inset 0 0 0 1px rgba(41, 36, 25, 0.22),
+    0 0 0 2.5px var(--color-gold-bright),
+    0 6px 18px rgba(10, 16, 12, 0.45);
+}
+
+.table.overlapping,
+.table.selected.overlapping {
+  box-shadow:
+    inset 0 0 0 1px rgba(41, 36, 25, 0.22),
+    0 0 0 3px rgba(235, 106, 86, 0.88),
+    0 0 24px rgba(235, 106, 86, 0.3),
+    0 6px 18px rgba(10, 16, 12, 0.45);
+}
+
+.table .t-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-brick);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.table-pulse {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: table-glow 2.4s ease-out forwards;
+}
+
+@keyframes table-glow {
+  0% {
+    box-shadow:
+      0 0 0 4px rgba(232, 207, 143, 0.55),
+      0 0 22px 6px rgba(232, 207, 143, 0.35);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* One chair per seat, rotated to face its table. Occupied chairs sit under
+   the guest's chip; the backrest peeks out on the aisle side. */
+.seat-chair {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 33px;
+  height: 33px;
+  pointer-events: none;
+}
+
+.seat-chair svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 170ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The chair a hovering chip would take pulls out from the table to say
+   "sit here" — the marker is rotated to face the table, so local −x is away. */
+.seat-chair.inviting svg {
+  transform: translateX(-7px);
+  filter: drop-shadow(0 0 5px rgba(232, 207, 143, 0.55));
+}
+
+/* ---- guest chips ----------------------------------------------------------- */
+
+.chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+  background: #f6efdd;
+  border: 2px solid var(--group, var(--color-gold));
+  box-shadow: 0 3px 8px rgba(8, 13, 10, 0.5);
+  cursor: grab;
+  transition: transform var(--chip-move), box-shadow 200ms ease, opacity 300ms ease;
+  will-change: transform;
+  /* Above the tables (z 5) and their chairs: a chip, and the name tag that
+     pops up over it, must never disappear behind a tabletop. */
+  z-index: 10;
+}
+
+/* The chip someone is looking at floats over its neighbours too, so its name
+   tag isn't hidden by the next chair along. */
+.chip:hover,
+.chip.selected {
+  z-index: 32;
+}
+
+.chip.dragging {
+  transition: box-shadow 200ms ease;
+  cursor: grabbing;
+  z-index: 40;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
+}
+
+/* A resting chip in the lounge — a plain flex item, not stage-positioned. */
+.chip.flow {
+  position: relative;
+  left: auto;
+  top: auto;
+  margin: 0;
+}
+
+.chip.selected {
+  box-shadow:
+    0 0 0 2.5px var(--color-gold-bright),
+    0 3px 8px rgba(8, 13, 10, 0.5);
+}
+
+.chip.rsvp-pending {
+  opacity: 0.82;
+  border-style: dashed;
+}
+
+/* Spotlight while a rule in the sidebar is hovered — this chip is one of the
+   guests that rule is about. */
+.chip.rule-glow {
+  z-index: 30;
+  box-shadow:
+    0 0 0 3px rgba(232, 207, 143, 0.95),
+    0 0 18px 6px rgba(232, 207, 143, 0.45),
+    0 3px 8px rgba(8, 13, 10, 0.5);
+}
+
+.chip.rule-glow .nametag {
+  opacity: 1;
+}
+
+.chip .viol-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-brick);
+  border: 2px solid var(--color-pine-900);
+}
+
+/* A pushpin, seen from above: the human's "leave this one exactly here". */
+.chip .pin {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #f7e7b8, var(--color-gold) 55%, #8c7433 100%);
+  box-shadow: 0 1px 3px rgba(5, 9, 6, 0.6), inset 0 0 0 1px rgba(255, 244, 214, 0.35);
+}
+
+.chip .pin::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  width: 2px;
+  height: 6px;
+  border-radius: 0 0 1px 1px;
+  background: linear-gradient(#e9dcc0, #6f5a22);
+  transform: rotate(-24deg);
+  transform-origin: 50% 0;
+}
+
+/* The settle when a person drops a chip into a seat: one soft ivory ring. */
+.chip-settle {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: chip-settle 520ms ease-out forwards;
+}
+
+@keyframes chip-settle {
+  0% {
+    box-shadow: 0 0 0 0 rgba(236, 223, 195, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(236, 223, 195, 0);
+  }
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: chip-pulse 2.6s ease-out forwards;
+}
+
+@keyframes chip-pulse {
+  0% {
+    box-shadow:
+      0 0 0 3px rgba(232, 207, 143, 0.95),
+      0 0 18px 6px rgba(232, 207, 143, 0.55);
+  }
+  60% {
+    box-shadow:
+      0 0 0 3px rgba(232, 207, 143, 0.4),
+      0 0 10px 3px rgba(232, 207, 143, 0.2);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.chip .nametag {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 31, 24, 0.92);
+  color: var(--color-linen);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(197, 165, 94, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.chip:hover .nametag,
+.chip.dragging .nametag,
+.chip.selected .nametag {
+  opacity: 1;
+}
+
+.nametag.flash {
+  animation: tag-flash 2.6s ease-out forwards;
+}
+
+/* A lounge chip's nametag, portalled to the body so the lounge's own
+   vertical scrolling can never clip it off. Positioned in real viewport
+   pixels from the chip's measured rect (see Chip in Canvas.tsx). */
+.nametag-portal {
+  position: fixed;
+  z-index: 90;
+  transform: translate(-50%, calc(-100% - 7px));
+  background: rgba(20, 31, 24, 0.96);
+  color: var(--color-linen);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(197, 165, 94, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: nametag-portal-in 120ms ease;
+}
+
+@keyframes nametag-portal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tag-flash {
+  0%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.chip,
+.table {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip:focus-visible,
+.table:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+/* ---- violation lines ------------------------------------------------------- */
+
+.viol-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.viol-lines path {
+  stroke: var(--color-brick);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 5;
+  fill: none;
+  opacity: 0.85;
+  animation: dash-crawl 1.4s linear infinite;
+}
+
+@keyframes dash-crawl {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* ---- the agent's ghost cursor ---------------------------------------------- */
+
+.agent-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+  transform-origin: 3px 3px;
+  will-change: transform;
+  filter: drop-shadow(0 3px 7px rgba(5, 9, 6, 0.55));
+  transition: filter 400ms ease;
+}
+
+/* Parked between actions while the agent's session is live — present, at rest. */
+.agent-cursor.idle {
+  filter: drop-shadow(0 3px 7px rgba(5, 9, 6, 0.55)) opacity(0.72);
+}
+
+.agent-cursor.idle .agent-cursor-pointer {
+  animation: cursor-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes cursor-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.93);
+  }
+}
+
+.agent-cursor-pointer {
+  display: block;
+  fill: var(--color-gold-bright);
+  stroke: rgba(20, 31, 24, 0.9);
+  transition: transform 160ms ease;
+  transform-origin: 3px 3px;
+}
+
+.agent-cursor.carrying .agent-cursor-pointer {
+  transform: scale(0.86) rotate(-8deg);
+}
+
+.agent-cursor-tag {
+  position: absolute;
+  left: 15px;
+  top: 21px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #efd89a, var(--color-gold-bright));
+  border: 1px solid rgba(20, 31, 24, 0.55);
+  padding: 2px 7px;
+  color: #241d10;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* What the agent says while it works — a real speech bubble, tail and all. */
+.agent-cursor-bubble {
+  position: absolute;
+  left: 15px;
+  top: 44px;
+  max-width: 340px;
+  border-radius: 7px;
+  background: rgba(20, 31, 24, 0.94);
+  border: 1px solid rgba(232, 207, 143, 0.6);
+  padding: 4px 10px 5px;
+  color: var(--color-linen);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  width: max-content;
+}
+
+.agent-cursor-bubble::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 9px;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-top: 1px solid rgba(232, 207, 143, 0.6);
+  border-left: 1px solid rgba(232, 207, 143, 0.6);
+  background: rgba(20, 31, 24, 0.98);
+}
+
+.agent-ripple {
+  position: absolute;
+  z-index: 39;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: agent-ripple 700ms ease-out forwards;
+}
+
+@keyframes agent-ripple {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(232, 207, 143, 0.65),
+      0 0 14px 4px rgba(232, 207, 143, 0.3);
+  }
+  100% {
+    box-shadow:
+      0 0 0 30px rgba(232, 207, 143, 0),
+      0 0 4px 1px rgba(232, 207, 143, 0);
+  }
+}
+
+/* ---- overlays: banner, hint, ribbon ----------------------------------------- */
+
+/* The agent's Keep/Revert proposal — a fixed chrome overlay on the canvas
+   wrap (never inside the zoomed stage), so it stays legible at any zoom. */
+.proposal-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 190px);
+  background: linear-gradient(180deg, #dfc27a, var(--color-gold));
+  color: #241d10;
+  border: 1px solid rgba(140, 116, 51, 0.6);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 8px 6px 16px;
+  border-radius: 6px;
+  box-shadow: 0 8px 26px rgba(4, 9, 6, 0.5);
+  animation: entry-in 300ms ease;
+}
+
+.proposal-banner-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proposal-banner button {
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.proposal-banner button:hover {
+  transform: translateY(-1px);
+}
+
+.proposal-banner button:focus-visible {
+  outline: 2px solid var(--color-pine-950);
+  outline-offset: 1px;
+}
+
+.proposal-keep {
+  background: var(--color-pine-800);
+  color: var(--color-linen);
+}
+
+.proposal-keep:hover {
+  background: var(--color-pine-900);
+}
+
+.proposal-revert {
+  background: rgba(253, 250, 243, 0.72);
+  color: #5c4d22;
+}
+
+.proposal-revert:hover {
+  background: rgba(253, 250, 243, 0.95);
+}
+
+.viol-banner {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  background: linear-gradient(180deg, #c96455, var(--color-brick));
+  color: #fdf6ec;
+  border: 1px solid #8e3a2f;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  cursor: pointer;
+  animation: entry-in 300ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+/* ---- a question from the agent ---------------------------------------------
+   Fixed chrome like the banners: the agent's tool call is waiting on this. */
+
+.agent-question {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 96;
+  display: flex;
+  width: min(440px, calc(100% - 200px));
+  flex-direction: column;
+  gap: 8px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(140, 116, 51, 0.5);
+  border-top: 3px solid var(--color-gold);
+  /* Square corners, like a real note card — a gold top edge wants a crisp edge. */
+  border-radius: 0;
+  background: var(--color-card);
+  padding: 10px 14px 10px;
+  color: var(--color-ink);
+  box-shadow: 0 18px 40px -12px rgba(4, 9, 6, 0.6), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
+  animation: entry-in 300ms ease;
+}
+
+.agent-question.below-banner {
+  top: 62px;
+}
+
+.agent-question-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-gold-ink);
+}
+
+.agent-question-text {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.agent-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-question-options button {
+  border: 1px solid var(--color-pine-line);
+  border-radius: 4px;
+  background: var(--color-pine-800);
+  padding: 5px 12px;
+  color: var(--color-linen);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.agent-question-options button:hover {
+  background: var(--color-pine-900);
+  transform: translateY(-1px);
+}
+
+.agent-question-options button:focus-visible,
+.agent-question-free button:focus-visible,
+.agent-question-skip:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.agent-question-free {
+  display: flex;
+  gap: 6px;
+}
+
+.agent-question-free input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--color-input);
+  border-radius: 4px;
+  background: var(--color-ivory);
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--color-ink);
+}
+
+.agent-question-free input:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -1px;
+}
+
+.agent-question-free button {
+  border: 1px solid var(--color-hairline);
+  border-radius: 4px;
+  background: var(--color-card);
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-pine-800);
+}
+
+.agent-question-free button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.agent-question-skip {
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-ink-soft);
+  font-size: 11.5px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-ink-faint) 50%, transparent);
+  text-underline-offset: 2px;
+}
+
+.agent-question-skip:hover {
+  color: var(--color-ink-soft);
+}
+
+/* ---- petals ----------------------------------------------------------------- */
+
+.petals {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.petal {
+  position: absolute;
+  top: -24px;
+  border-radius: 62% 0 62% 0;
+  opacity: 0;
+  box-shadow: inset -2px -2px 3px rgba(41, 36, 25, 0.12);
+  animation-name: petal-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes petal-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  8% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 0px), 105vh) rotate(var(--spin, 360deg));
+  }
+}
+
+.viol-banner:hover {
+  transform: translateX(-50%) translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.ribbon {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #dfc27a, var(--color-gold));
+  color: #241d10;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  padding: 7px 26px;
+  border-radius: 3px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  animation: entry-in 400ms ease;
+}
+
+.empty-room {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--color-linen);
+  max-width: 380px;
+}
+
+.empty-room h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 30px;
+  margin: 0 0 6px;
+  color: var(--color-gold-bright);
+}
+
+.empty-room p {
+  color: var(--color-linen-dim);
+  margin: 0 0 16px;
+}
+
+@keyframes entry-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+}
+
+.empty-room,
+.empty-room * {
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .venue-feature,
+  .table-wrap.glide,
+  .seat-chair.glide {
+    transition: none;
+  }
+
+  .pulse-ring,
+  .table-pulse,
+  .nametag.flash,
+  .viol-lines path,
+  .agent-ripple,
+  .chip-settle,
+  .petal {
+    animation: none;
+  }
+
+  .seat-chair svg {
+    transition: none;
+  }
+
+  /* The choreographer already skips queuing under reduced motion; this is the belt to that suspender. */
+  .agent-cursor {
+    display: none;
+  }
+}

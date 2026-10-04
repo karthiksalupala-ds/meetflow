@@ -1,0 +1,768 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/eb-garamond";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * MeetFlow design system.
+ * The palette: warm ivory chrome around a deep pine "banquet board" canvas,
+ * candlelight gold for the agent and primary actions, brick for trouble.
+ * shadcn's semantic tokens map onto this palette so every component matches.
+ */
+
+@theme inline {
+  /*
+   * Type: a stationery pairing. Karla — a grotesque with a little quirk — for
+   * the working text; Cormorant and EB Garamond for anything that should read
+   * like a printed program; IBM Plex Mono for the drafting-table layer of
+   * numbers (feet, counts, tool names), the way dimensions are lettered on
+   * an architect's sheet.
+   */
+  --font-sans: 'Karla', 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-heading: 'EB Garamond Variable', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  /* MeetFlow's own palette, as first-class utilities (bg-pine-900, text-gold…) */
+  --color-ivory: #f2ecdf;
+  --color-parchment: #e7dfcb;
+  /* Three inks, all readable on ivory at small sizes: ink 11:1, soft 6:1,
+     faint 4.6:1 (WCAG AA). Faint is for captions, never for anything the
+     eye has to find; hairline stays light because it is only ever a rule. */
+  --color-ink: #29241d;
+  --color-ink-soft: #5f5546;
+  --color-ink-faint: #746a58;
+  --color-hairline: #d8cdb2;
+  --color-pine-950: #141f18;
+  --color-pine-900: #1c2b21;
+  --color-pine-800: #24352a;
+  --color-pine-line: #35493a;
+  --color-linen: #ecdfc3;
+  --color-linen-dim: #a9b7a3;
+  --color-gold: #c5a55e;
+  --color-gold-bright: #e8cf8f;
+  /* Text-safe versions of the accents: 4.8–5.1:1 on ivory. */
+  --color-gold-ink: #7a6329;
+  --color-brick: #a84a3d;
+  --color-ok: #7d9b6a;
+  --color-sage: #4f6a40;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /*
+   * One family of colors, not five: warm ivory paper, deep pine green for
+   * anything you press, candlelight gold reserved for the agent, brick for
+   * trouble. shadcn's semantic tokens all resolve into that palette.
+   */
+  --background: #f5f0e4;
+  --foreground: #29241d;
+  --card: #fdfaf3;
+  --card-foreground: #29241d;
+  --popover: #fdfaf3;
+  --popover-foreground: #29241d;
+  --primary: #24352a;
+  --primary-foreground: #f1e7cf;
+  --secondary: #e7dfcb;
+  --secondary-foreground: #29241d;
+  --muted: #e7dfcb;
+  --muted-foreground: #5f5546;
+  --accent: #e3ddc7;
+  --accent-foreground: #1c2b21;
+  --destructive: #a84a3d;
+  --border: #d8cdb2;
+  --input: #cdc0a1;
+  --ring: #5d7a4c;
+  --radius: 0.5rem;
+  --chart-1: #5d7a4c;
+  --chart-2: #7d9b6a;
+  --chart-3: #c5a55e;
+  --chart-4: #a99e8a;
+  --chart-5: #24352a;
+  --sidebar: #f2ecdf;
+  --sidebar-foreground: #29241d;
+  --sidebar-primary: #24352a;
+  --sidebar-primary-foreground: #f1e7cf;
+  --sidebar-accent: #e3ddc7;
+  --sidebar-accent-foreground: #1c2b21;
+  --sidebar-border: #d8cdb2;
+  --sidebar-ring: #5d7a4c;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply antialiased bg-background text-foreground;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  /*
+   * Paper. A fixed sheet of grain over the whole window — multiplied, so the
+   * ivory chrome reads as stock rather than a flat fill and the pine floor
+   * picks up the faintest felt. One tiled SVG, rasterized once; it never
+   * repaints or intercepts a pointer.
+   */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    pointer-events: none;
+    /* Kept faint on purpose: grain over text costs legibility fast. */
+    opacity: 0.045;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.22 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
+    background-size: 220px 220px;
+  }
+
+  @media print {
+    body::after {
+      display: none;
+    }
+  }
+}
+
+@layer components {
+  /* Small caps in the serif — the stationery way to set a running label,
+     where a template would reach for tracked uppercase sans. */
+  .smallcaps {
+    font-family: var(--font-serif);
+    font-variant-caps: small-caps;
+    /* Cormorant runs light and small on the x-height; bold and a size up
+       is what keeps a 13px running head readable. */
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* Figures set like dimensions on a drawing: mono, tabular, slightly small. */
+  .figures {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---- the masthead ------------------------------------------------------- */
+
+  .masthead {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 54px;
+    border-bottom: 1px solid var(--color-hairline);
+    background: var(--color-ivory);
+    padding: 7px 16px 7px 18px;
+  }
+
+  /* A second, fainter rule under the first — the double line of a program's
+     running head. */
+  .masthead::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -4px;
+    left: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-hairline) 55%, transparent);
+    pointer-events: none;
+  }
+
+  .masthead-wordmark {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: var(--font-serif);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    color: var(--color-ink);
+  }
+
+  .masthead-fleuron {
+    font-size: 20px;
+    color: var(--color-gold);
+    transform: translateY(-1px);
+  }
+
+  .masthead-rule {
+    width: 1px;
+    height: 30px;
+    background: var(--color-hairline);
+  }
+
+  .masthead-icongroup {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: 6px;
+    background: var(--color-card);
+  }
+
+  .masthead-icongroup button {
+    display: flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-soft);
+    font-family: var(--font-serif);
+    font-size: 19px;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .masthead-icongroup button + button {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .masthead-icongroup button:hover:not(:disabled) {
+    background: var(--color-parchment);
+    color: var(--color-ink);
+  }
+
+  .masthead-icongroup button:disabled {
+    color: color-mix(in srgb, var(--color-ink-faint) 55%, transparent);
+    cursor: default;
+  }
+
+  .masthead-icongroup button:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -2px;
+  }
+
+  /* ---- the agent's place card --------------------------------------------- */
+
+  .placecard {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    max-width: 260px;
+    border: 1px solid var(--color-hairline);
+    border-top: 2px solid var(--color-ink-faint);
+    border-radius: 3px;
+    background: var(--color-card);
+    padding: 4px 12px 5px 10px;
+    color: var(--color-ink-soft);
+    text-align: left;
+    white-space: nowrap;
+    box-shadow:
+      0 1px 0 rgba(41, 36, 29, 0.05),
+      0 8px 16px -10px rgba(41, 36, 29, 0.35);
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  }
+
+  .placecard:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-gold);
+    box-shadow:
+      0 1px 0 rgba(41, 36, 29, 0.05),
+      0 12px 22px -12px rgba(41, 36, 29, 0.45);
+  }
+
+  .placecard:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .placecard-ready { border-top-color: var(--color-ok); }
+  .placecard-live { border-top-color: var(--color-gold); }
+
+  .placecard-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--font-serif);
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--color-ink);
+    text-overflow: ellipsis;
+  }
+
+  .placecard-meta {
+    margin-top: 2px;
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-ink-soft);
+    text-overflow: ellipsis;
+  }
+
+  .placecard-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-ink-faint);
+  }
+
+  .placecard-ready .placecard-dot { background: var(--color-ok); }
+
+  .placecard-live .placecard-dot {
+    background: var(--color-gold);
+    animation: placecard-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes placecard-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-gold) 55%, transparent); }
+    100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-gold) 0%, transparent); }
+  }
+
+  @media (max-width: 900px) {
+    .placecard-meta { display: none; }
+  }
+}
+
+@layer base {
+  /* Any button, link, or ARIA-button-role element reads as clickable. Drag
+     handles and other elements set their own cursor (grab, row-resize…)
+     with a class selector, which wins the cascade over this attribute one. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  a[href],
+  select,
+  summary,
+  label[for],
+  input[type='checkbox'],
+  input[type='radio'] {
+    cursor: pointer;
+  }
+
+  /*
+   * Every scrollbar in the app — sidebar sections, select dropdowns, the
+   * paste-a-list textarea — gets the same thin, palette-matched treatment
+   * instead of the browser's default light/white one. `scrollbar-width` +
+   * `scrollbar-color` cover Firefox; the `::-webkit-scrollbar*` pseudo-
+   * elements cover Chrome, Safari, and Edge. Applied globally on `*` so any
+   * scrollable element gets it automatically, with no white track showing.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-faint) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-ink-faint);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-ink-soft);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* ---- first-run welcome and reusable coach marks ------------------------- */
+
+.welcome-dialog {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  translate: none !important;
+  transform: none !important;
+  overflow: hidden;
+  border-radius: 0;
+  padding: 0;
+  background:
+    radial-gradient(circle at 50% 26%, color-mix(in srgb, var(--color-gold) 17%, transparent), transparent 32%),
+    linear-gradient(145deg, var(--color-pine-950), var(--color-pine-900) 58%, #16251c);
+  color: var(--color-linen);
+  box-shadow: none;
+}
+
+.welcome-intro,
+.welcome-reveal {
+  position: relative;
+  display: flex;
+  width: min(920px, calc(100vw - 40px));
+  height: 100%;
+  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-content: safe center;
+  gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.welcome-kicker,
+.welcome-coach-kicker {
+  color: var(--color-gold-bright);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.welcome-intro h2,
+.welcome-reveal h2 {
+  max-width: 780px;
+  font-family: var(--font-heading);
+  font-size: clamp(38px, 6vw, 72px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.welcome-deck {
+  max-width: 620px;
+  color: color-mix(in srgb, var(--color-linen) 76%, transparent);
+  font-size: 15px;
+  line-height: 1.65;
+  text-wrap: balance;
+}
+
+.welcome-candle {
+  position: relative;
+  width: 28px;
+  height: 58px;
+  border-radius: 12px 12px 4px 4px;
+  background: linear-gradient(90deg, #ddc98f, #fff3c9 48%, #c8a963);
+  box-shadow: 0 0 50px color-mix(in srgb, var(--color-gold-bright) 36%, transparent);
+}
+
+.welcome-candle span {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  width: 15px;
+  height: 26px;
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  border-radius: 55% 45% 52% 48%;
+  background: radial-gradient(circle at 50% 67%, #fff7c8, #e8ad45 52%, #b85b2a 75%);
+  filter: drop-shadow(0 0 12px rgba(232, 173, 69, 0.7));
+  animation: welcome-flame 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes welcome-flame {
+  from { transform: translateX(-50%) rotate(-2deg) scale(0.96, 1.03); }
+  to { transform: translateX(-50%) rotate(2deg) scale(1.04, 0.96); }
+}
+
+.welcome-sketch {
+  width: min(520px, 80vw);
+  color: var(--color-gold-bright);
+}
+
+.welcome-sketch svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.welcome-sketch-room,
+.welcome-sketch-detail,
+.welcome-sketch-table,
+.welcome-sketch-flourish {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: welcome-draw 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.welcome-sketch-detail { opacity: 0.52; animation-delay: 120ms; }
+.welcome-sketch-table { opacity: 0.8; animation-delay: 260ms; }
+.welcome-sketch-flourish { stroke-width: 1.5; animation-delay: 460ms; }
+
+@keyframes welcome-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.welcome-intro-actions,
+.welcome-coach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.welcome-intro-actions [data-slot='button']:first-child,
+.welcome-reveal > [data-slot='button'] {
+  background: var(--color-gold);
+  color: var(--color-pine-950);
+}
+
+.welcome-intro-actions [data-slot='button']:last-child {
+  color: var(--color-linen);
+}
+
+.welcome-questionnaire-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+.welcome-questionnaire-shell [data-slot='questionnaire'] {
+  width: min(820px, 100%);
+}
+
+.welcome-card {
+  width: 100%;
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
+  background: var(--color-card);
+  color: var(--color-card-foreground);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(232, 207, 143, 0.16);
+}
+
+.welcome-card [data-slot='card-title'] {
+  font-size: clamp(26px, 4vw, 42px);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.welcome-card [data-slot='card-footer'] {
+  position: sticky;
+  z-index: 2;
+  bottom: calc(-1 * var(--card-spacing));
+  background: linear-gradient(transparent, var(--color-card) 20%);
+  padding-top: var(--card-spacing);
+  padding-bottom: 2px;
+}
+
+.welcome-sparkles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.welcome-sparkles span {
+  position: absolute;
+  top: 48%;
+  color: var(--color-gold-bright);
+  font-size: 16px;
+}
+
+.welcome-coach {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 70;
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-gold) 58%, var(--color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-card) 96%, transparent);
+  padding: 18px;
+  color: var(--color-foreground);
+  box-shadow: 0 22px 64px rgba(4, 10, 6, 0.34);
+  backdrop-filter: blur(14px);
+}
+
+.welcome-coach-top {
+  top: 76px;
+  bottom: auto;
+}
+
+.welcome-coach h2 {
+  font-family: var(--font-heading);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.welcome-coach p:not(.welcome-coach-kicker) {
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.welcome-coach-actions {
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.welcome-coach-complete > svg {
+  color: var(--color-gold-ink);
+}
+
+.welcome-tour-highlight {
+  position: relative;
+  outline: 3px solid var(--color-gold-bright) !important;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-gold) 20%, transparent), 0 0 34px color-mix(in srgb, var(--color-gold) 28%, transparent) !important;
+}
+
+@media (max-width: 640px) {
+  .welcome-intro,
+  .welcome-reveal {
+    width: calc(100vw - 28px);
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 36px 0 24px;
+  }
+
+  .welcome-intro h2,
+  .welcome-reveal h2 { font-size: 41px; }
+  .welcome-deck { font-size: 14px; }
+  .welcome-sketch { width: min(430px, 92vw); }
+  .welcome-questionnaire-shell { align-items: start; padding: 12px; }
+  .welcome-card { max-height: calc(100dvh - 24px); }
+  .welcome-coach { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
+  .welcome-coach-top { top: 66px; bottom: auto; }
+}
+
+@media (max-width: 480px) {
+  .welcome-card [data-slot='card-header'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .welcome-card [data-slot='card-action'] {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .welcome-card [data-slot='questionnaire-title'] {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .welcome-card [data-slot='questionnaire-description'] {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
+
+@media (max-height: 650px) and (min-width: 641px) {
+  .welcome-intro,
+  .welcome-reveal {
+    gap: 8px;
+    padding: 16px 0;
+  }
+
+  .welcome-candle {
+    width: 20px;
+    height: 36px;
+  }
+
+  .welcome-candle span {
+    width: 11px;
+    height: 18px;
+  }
+
+  .welcome-intro h2,
+  .welcome-reveal h2 {
+    font-size: clamp(32px, 4vw, 42px);
+  }
+
+  .welcome-deck {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .welcome-sketch {
+    width: min(300px, 45vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-candle span,
+  .welcome-sketch-room,
+  .welcome-sketch-detail,
+  .welcome-sketch-table,
+  .welcome-sketch-flourish {
+    animation: none;
+  }
+
+  .welcome-sketch-room,
+  .welcome-sketch-detail,
+  .welcome-sketch-table,
+  .welcome-sketch-flourish {
+    stroke-dashoffset: 0;
+  }
+
+  .welcome-tour-highlight { transition: none; }
+}
