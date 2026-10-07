@@ -31,7 +31,7 @@ resources, constraints, conflicts, and optimized layouts.
   undo/redo, proposals, and print/export workflows.
 - A primary College Hackathon sample with 100 participants, 20 team tables,
   5 mentor zones, 3 judge tables, registration, food, stage, entrance, and
-  exit.
+  exit
 
 ## Run locally
 
@@ -166,7 +166,6 @@ Some internal legacy compatibility identifiers remain in the source and persiste
 storage keys so existing browser data and legacy integrations are not silently
 broken. They are implementation details and are not part of the MeetFlow
 user-facing experience.
-
 ## License
 
 MIT. See [LICENSE](LICENSE).
